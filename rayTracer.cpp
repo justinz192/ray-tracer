@@ -7,10 +7,10 @@
 
 using namespace std;
 
-struct Light {
+struct Light { //represents a light source
     Light(const Vec3f &p, const float &i) : position(p), intensity(i){}
-    Vec3f position;
-    float intensity;
+    Vec3f position; //position of light ray source
+    float intensity; //intensity of the light source
 };
 
 struct Material {
@@ -19,15 +19,15 @@ struct Material {
     Material() : albedo(1, 0, 0), diffuse_color(), specular_exponent() {}
     Vec3f albedo; //the fraction of light that a surface reflects. 
     //If it is all reflected, the albedo is equal to 1. If 30% is reflected, the albedo is 0.3
-    //albedo[0] = light reflected as diffuse light, albedo[1] = light reflected as specular light
-    Vec3f diffuse_color;
+    //albedo[0] = light reflected as diffuse light, albedo[1] = light reflected as specular light, alebdo[2] = reflectivity
+    Vec3f diffuse_color; //RGB color of the sphere
     float specular_exponent; //how shiny or glossy the material is, higher value = sharper and brighter highlight
 };
 
 struct Sphere{
-    Vec3f center;
-    float radius;
-    Material material;
+    Vec3f center; //3D position of the sphere
+    float radius; //radius of the sphere
+    Material material; //material of sphere defines how light interacts with it
 
     Sphere(const Vec3f &c, const float &r, const Material &m) : center(c), radius(r), material(m) {}
     
@@ -76,19 +76,21 @@ Vec3f cast_ray(const Vec3f &orig, const Vec3f &dir, const vector<Sphere> &sphere
     Vec3f point, N;
     Material material;
 
-    if (depth>4 || !scene_intersect(orig, dir, spheres, point, N, material)) { //if ray does not intersect
+    //if ray does not intersect or recursion limit of 4 is reached
+    if (depth>4 || !scene_intersect(orig, dir, spheres, point, N, material)) { 
         return Vec3f(0.2, 0.7, 0.8); // background color
     }
 
-    Vec3f reflect_dir = reflect(dir, N).normalize(); 
+    //compute reflection
+    Vec3f reflect_dir = reflect(dir, N).normalize();  //calculates reflection light direction
     Vec3f reflect_orig = reflect_dir*N < 0 ? point - N*1e-3 : point + N*1e-3; // offset the original point to avoid occlusion by the object itself
-    Vec3f reflect_color = cast_ray(reflect_orig, reflect_dir, spheres, lights, depth + 1);
+    Vec3f reflect_color = cast_ray(reflect_orig, reflect_dir, spheres, lights, depth + 1); //recursive call allows handling multiple reflections like with mirrors
 
     //Determines diffuse illumination
     float diffuse_light_intensity = 0, specular_light_intensity = 0;
     for (size_t i =0; i < lights.size(); i++) {
         Vec3f light_dir = (lights[i].position - point).normalize(); //computes direction from the intersection to light source
-        float light_distance = (lights[i].position - point).norm();
+        float light_distance = (lights[i].position - point).norm(); //finds distance between intersection and light source
 
         Vec3f shadow_orig = light_dir*N < 0 ? point - N*1e-3 : point + N*1e-3; // checking if the point lies in the shadow of the lights[i]
         Vec3f shadow_pt, shadow_N;
@@ -99,6 +101,7 @@ Vec3f cast_ray(const Vec3f &orig, const Vec3f &dir, const vector<Sphere> &sphere
         //determine the intensity of the light using dot product between light direction and surface normal
         diffuse_light_intensity += lights[i].intensity * max(0.f, light_dir*N); 
         
+        //Phong Reflection
         //determines the specular intensity (shiny highlights) using dot product between light direction and reflected direction
         //raised to the specular exponent to control how sharp or blurry highlight is
         //scaled by light intensity
@@ -106,7 +109,7 @@ Vec3f cast_ray(const Vec3f &orig, const Vec3f &dir, const vector<Sphere> &sphere
         material.specular_exponent)*lights[i].intensity;
     }
     //if intersects with a sphere, returns sum of diffuse and specular lighting values
-    //scaled by light intensity and albedo value (specular highlights are white (1., 1., 1.,) or (255, 255, 255))
+    //scaled by light intensity and albedo value (specular highlights are white (1., 1., 1.,) or (255, 255, 255)) and reflected amount of light and its color
     return material.diffuse_color*diffuse_light_intensity*material.albedo[0] + Vec3f(1., 1., 1.)*specular_light_intensity * material.albedo[1] + reflect_color*material.albedo[2]; 
 }
 
